@@ -17,30 +17,39 @@ jobs:
           tools: composer:v2
           coverage: xdebug
 
-      - name: Install Dependencies
+      - name: Install Composer Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Setup Environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install NPM Dependencies
+        run: npm install
+
+      - name: Build Frontend Assets
+        run: npm run build
+
+      - name: Setup Environment For Tests
         run: |
           cp .env.example .env
           sed -i '/^DB_CONNECTION=/s/=.*/=sqlite/' .env
           sed -i '/^DB_DATABASE=/s/=.*/=:memory:/' .env
-          echo "APP_KEY=" >> .env # Ensure APP_KEY line exists if not in .env.example
+          echo "APP_KEY=" >> .env
           php artisan key:generate --ansi
           echo "APP_ENV=testing" >> .env
           echo "CACHE_DRIVER=array" >> .env
           echo "SESSION_DRIVER=array" >> .env
           echo "QUEUE_CONNECTION=sync" >> .env
-          echo "LOG_CHANNEL=stderr" >> .env # Good for CI to see logs directly
+          echo "LOG_CHANNEL=stderr" >> .env
 
-      - name: Run Migrations (for SQLite in-memory)
-        run: php artisan migrate --force # --force to run in non-interactive CI
+      - name: Run Migrations
+        run: php artisan migrate --force
 
-      - name: Run Pest Tests
+      - name: Execute Pest Tests
         env:
-          # The .env file created in 'Setup Environment' step will be used.
-          # Explicitly setting DB vars here can serve as an override if needed,
-          # but APP_KEY generated into .env is preferred over a secret for ephemeral test runs.
           DB_CONNECTION: sqlite
           DB_DATABASE: ':memory:'
         run: ./vendor/bin/pest --ci
