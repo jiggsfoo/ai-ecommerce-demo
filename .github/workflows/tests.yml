@@ -20,5 +20,27 @@ jobs:
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Tests
+      - name: Setup Environment
+        run: |
+          cp .env.example .env
+          sed -i '/^DB_CONNECTION=/s/=.*/=sqlite/' .env
+          sed -i '/^DB_DATABASE=/s/=.*/=:memory:/' .env
+          echo "APP_KEY=" >> .env # Ensure APP_KEY line exists if not in .env.example
+          php artisan key:generate --ansi
+          echo "APP_ENV=testing" >> .env
+          echo "CACHE_DRIVER=array" >> .env
+          echo "SESSION_DRIVER=array" >> .env
+          echo "QUEUE_CONNECTION=sync" >> .env
+          echo "LOG_CHANNEL=stderr" >> .env # Good for CI to see logs directly
+
+      - name: Run Migrations (for SQLite in-memory)
+        run: php artisan migrate --force # --force to run in non-interactive CI
+
+      - name: Run Pest Tests
+        env:
+          # The .env file created in 'Setup Environment' step will be used.
+          # Explicitly setting DB vars here can serve as an override if needed,
+          # but APP_KEY generated into .env is preferred over a secret for ephemeral test runs.
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
         run: ./vendor/bin/pest --ci
